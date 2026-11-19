@@ -1,87 +1,68 @@
 
-import {
-  Search,
-  Bell,
-  ChevronDown,
-} from 'lucide-react'
+import { Search, Bell, ChevronDown } from 'lucide-react'
 
-// Definimos las propiedades que recibirá el componente.
+// Propiedades que recibe el componente.
 type HeaderProps = {
   title: string
 }
 
 function Header({ title }: HeaderProps) {
   return (
-    <header className="flex h-20 items-center justify-between border-b border-slate-200 bg-white px-8">
+    <header className="flex min-h-20 items-center justify-between gap-4 border-b border-slate-200 bg-white px-5 py-4 md:px-8">
 
       {/* Título de la página */}
-      <div>
-        <h2 className="text-xl font-bold text-slate-800">
+      <div className="min-w-0 pl-12 md:pl-0">
+        <h2 className="truncate text-lg font-bold text-slate-800 md:text-xl">
           {title}
         </h2>
 
-        <p className="text-sm text-slate-500">
+        <p className="hidden text-sm text-slate-500 sm:block">
           Gestiona tus reservas y citas
         </p>
       </div>
 
-      {/* Zona derecha: búsqueda y perfil */}
-      <div className="flex items-center gap-6">
+      {/* Acciones del encabezado */}
+      <div className="flex shrink-0 items-center gap-2 sm:gap-4">
 
         {/* Buscador */}
-        <div className="relative hidden md:block">
-
-          <Search
-            size={18}
-            className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"
-          />
+        <div className="hidden items-center gap-2 rounded-lg bg-slate-100 px-3 py-2 lg:flex">
+          <Search size={18} className="text-slate-400" />
 
           <input
-            type="search"
+            type="text"
+            placeholder="Buscar..."
             aria-label="Buscar"
-            placeholder="Buscar reservas, clientes..."
-            className="w-72 rounded-xl border border-slate-200 bg-slate-50 py-2.5 pl-10 pr-4 text-sm outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+            className="w-40 bg-transparent text-sm outline-none placeholder:text-slate-400"
           />
-
         </div>
 
         {/* Notificaciones */}
         <button
-          type="button"
+          className="relative rounded-lg p-2 text-slate-500 transition-colors hover:bg-slate-100"
           aria-label="Notificaciones"
-          className="relative rounded-xl p-2 transition-colors hover:bg-slate-100"
         >
-          <Bell size={21} className="text-slate-500" />
+          <Bell size={21} />
 
-          <span
-            aria-label="Tienes notificaciones pendientes"
-            className="absolute right-1 top-1 h-2.5 w-2.5 rounded-full border-2 border-white bg-red-500"
-          />
+          <span className="absolute right-2 top-2 h-2 w-2 rounded-full bg-red-500" />
         </button>
 
-        {/* Perfil del administrador */}
-        <div className="flex items-center gap-3 border-l border-slate-200 pl-6">
+        {/* Perfil */}
+        <button className="flex items-center gap-2 rounded-lg p-2 transition-colors hover:bg-slate-100">
 
-          <div className="flex h-10 w-10 items-center justify-center rounded-full bg-indigo-500 text-sm font-semibold text-white">
-            AD
+          <div className="flex h-9 w-9 items-center justify-center rounded-full bg-blue-100 text-sm font-bold text-blue-700">
+            A
           </div>
 
-          <div className="hidden sm:block">
-            <p className="text-sm font-semibold text-slate-800">
-              Administrador
-            </p>
-
-            <p className="text-xs text-slate-500">
-              Administrador general
-            </p>
-          </div>
+          <span className="hidden text-sm font-medium text-slate-700 sm:block">
+            Admin
+          </span>
 
           <ChevronDown
-            size={17}
+            size={16}
             className="hidden text-slate-400 sm:block"
           />
 
-        </div>
+        </button>
 
       </div>
 
