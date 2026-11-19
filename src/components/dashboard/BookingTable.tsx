@@ -1,62 +1,12 @@
 
 import { CalendarDays, Clock } from 'lucide-react'
 
-// Definimos la estructura de una reserva.
-type Booking = {
-  id: number
-  client: string
-  service: string
-  date: string
-  time: string
-  status: 'Confirmada' | 'Pendiente' | 'Cancelada'
-}
+import type { Booking, BookingStatus } from '../../types/booking'
 
-// Datos ficticios para nuestra primera tabla.
-const bookings: Booking[] = [
-  {
-    id: 1,
-    client: 'Laura Martínez',
-    service: 'Consulta general',
-    date: '19 Nov 2026',
-    time: '09:00',
-    status: 'Confirmada',
-  },
-  {
-    id: 2,
-    client: 'Carlos García',
-    service: 'Revisión',
-    date: '19 Nov 2026',
-    time: '10:30',
-    status: 'Pendiente',
-  },
-  {
-    id: 3,
-    client: 'María López',
-    service: 'Sesión individual',
-    date: '19 Nov 2026',
-    time: '12:00',
-    status: 'Confirmada',
-  },
-  {
-    id: 4,
-    client: 'Javier Sánchez',
-    service: 'Consulta inicial',
-    date: '20 Nov 2026',
-    time: '09:30',
-    status: 'Cancelada',
-  },
-  {
-    id: 5,
-    client: 'Ana Fernández',
-    service: 'Revisión',
-    date: '20 Nov 2026',
-    time: '11:00',
-    status: 'Confirmada',
-  },
-]
+import { initialBookings } from '../../data/bookings'
 
 // Devuelve los colores correspondientes a cada estado.
-function getStatusStyles(status: Booking['status']) {
+function getStatusStyles(status: BookingStatus) {
   switch (status) {
     case 'Confirmada':
       return 'bg-green-50 text-green-700'
@@ -121,7 +71,7 @@ function BookingTable() {
 
           <tbody className="divide-y divide-slate-100">
 
-            {bookings.map((booking) => (
+            {initialBookings.map((booking: Booking) => (
               <tr
                 key={booking.id}
                 className="transition-colors hover:bg-slate-50"
