@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 
 import { CalendarDays, Clock, Users, Search, Plus, Trash2, } from 'lucide-react'
 
@@ -6,7 +6,16 @@ import type { Booking, BookingStatus } from '../types/booking'
 
 import { initialBookings } from '../data/bookings'
 
+import {
+  getStoredBookings,
+  saveBookings,
+} from '../services/bookingStorage'
+
 import BookingForm from '../components/bookings/BookingForm'
+
+import Toast from '../components/ui/Toast'
+
+import type { ToastType } from '../components/ui/Toast'
 
 // Devuelve los estilos visuales según el estado.
 function getStatusStyles(status: BookingStatus) {
@@ -23,8 +32,11 @@ function getStatusStyles(status: BookingStatus) {
 }
 
 function Reservas() {
-  // Lista de reservas gestionada por React.
-  const [bookings, setBookings] = useState<Booking[]>(initialBookings)
+  // Recuperamos las reservas guardadas.
+  // Si no existen, utilizamos los datos iniciales.
+  const [bookings, setBookings] = useState<Booking[]>(() => {
+    return getStoredBookings() ?? initialBookings
+  })
 
   // Controla si mostramos el formulario.
   const [isFormOpen, setIsFormOpen] = useState(false)
@@ -39,6 +51,12 @@ function Reservas() {
   // Estado seleccionado en el filtro.
   const [statusFilter, setStatusFilter] = useState('Todas')
 
+  // Controla la notificación que se muestra.
+  const [toast, setToast] = useState<{
+    message: string
+    type: ToastType
+  } | null>(null)
+
   // Filtramos las reservas según la búsqueda y el estado.
   const filteredBookings = bookings.filter((booking) => {
 
@@ -51,6 +69,13 @@ function Reservas() {
 
     return matchesSearch && matchesStatus
   })
+
+  // Guardamos las reservas cada vez que cambia la lista.
+  useEffect(() => {
+    saveBookings(bookings)
+  }, [bookings])
+
+
 
   // Añade una nueva reserva a la lista.
   function handleSaveBooking(newBooking: Omit<Booking, 'id'>) {
@@ -73,6 +98,11 @@ function Reservas() {
 
     // Cerramos el formulario después de guardar.
     setIsFormOpen(false)
+
+    setToast({
+      message: 'Reserva creada correctamente',
+      type: 'success',
+    })
   }
 
   // Actualiza los datos de una reserva existente.
@@ -94,6 +124,11 @@ function Reservas() {
     // Cerramos el formulario y limpiamos la edición.
     setIsFormOpen(false)
     setEditingBooking(null)
+
+    setToast({
+      message: 'Reserva actualizada correctamente',
+      type: 'success',
+    })
   }
 
   // Abre el formulario con los datos de la reserva seleccionada.
@@ -116,6 +151,10 @@ function Reservas() {
     setBookings((currentBookings) =>
       currentBookings.filter((booking) => booking.id !== id)
     )
+    setToast({
+      message: 'Reserva eliminada correctamente',
+      type: 'success',
+    })
   }
 
   return (
@@ -200,6 +239,7 @@ function Reservas() {
         <div className="mb-6">
           <BookingForm
             initialBooking={editingBooking ?? undefined}
+            existingBookings={bookings}
             onSave={
               editingBooking
                 ? handleUpdateBooking
@@ -382,6 +422,14 @@ function Reservas() {
           </table>
 
         </div>
+
+        {toast && (
+          <Toast
+            message={toast.message}
+            type={toast.type}
+            onClose={() => setToast(null)}
+          />
+        )}
 
       </div>
 

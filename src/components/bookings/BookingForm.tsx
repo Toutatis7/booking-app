@@ -1,5 +1,6 @@
 
 import { useState } from 'react'
+import type { SyntheticEvent } from 'react'
 
 import type { Booking, BookingStatus } from '../../types/booking'
 
@@ -8,14 +9,26 @@ type BookingFormProps = {
   onSave: (booking: Omit<Booking, 'id'>) => void
   onCancel: () => void
   initialBooking?: Booking
+  existingBookings: Booking[]
 }
 
 function BookingForm({
     onSave,
     onCancel,
     initialBooking,
+    existingBookings,
 }: BookingFormProps) {
 
+    // Obtenemos la fecha actual en formato YYYY-MM-DD.
+    function getTodayDate(): string {
+      const today = new Date()
+
+      const year = today.getFullYear()
+      const month = String(today.getMonth() + 1).padStart(2, '0')
+      const day = String(today.getDate()).padStart(2, '0')
+
+      return `${year}-${month}-${day}`
+    }
     // Estados de los campos del formulario.
     // Inicializamos los campos con los datos de la reserva,
     // si estamos editando. Si es nueva, empezarán vacíos.
@@ -27,18 +40,68 @@ function BookingForm({
     initialBooking?.status ?? 'Pendiente'
     )
 
-  // Procesamos el envío del formulario.
-  function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
-    event.preventDefault()
+    // Almacena los posibles errores de validacion.
+    const [formError, setFormError ] = useState('')
 
-    onSave({
-      client,
-      service,
-      date,
-      time,
-      status,
-    })
-  }
+    // Procesamos el envío del formulario.
+    function handleSubmit(event: SyntheticEvent<HTMLFormElement>) {
+      event.preventDefault()
+
+      // Eliminamos los espacios innecesarios.
+      const cleanClient = client.trim()
+      const cleanService = service.trim()
+
+      // Comprobamos que los campos de texto no estén vacíos.
+      if (!cleanClient || !cleanService) {
+        setFormError('El nombre del cliente y el servicio son obligatorios.')
+        return
+      }
+
+      // Comprobamos que la fecha no esté vacía.
+      if (!date) {
+        setFormError('Debes seleccionar una fecha.')
+        return
+      }
+
+      // Comprobamos que la fecha no sea anterior a hoy.
+      if (date < getTodayDate()) {
+        setFormError('No puedes crear una reserva en una fecha pasada.')
+        return
+      }
+
+      // Comprobamos que se haya seleccionado una hora.
+      if (!time) {
+        setFormError('Debes seleccionar una hora.')
+        return
+      }
+
+      // Comprobamos si ya existe otra reserva en esa fecha y hora.
+      const hasConflict = existingBookings.some((booking) => {
+        return (
+          booking.date === date &&
+          booking.time === time &&
+          booking.id !== initialBooking?.id
+        )
+      })
+
+      // Si existe otra reserva, detenemos el envío.
+      if (hasConflict) {
+        setFormError('Ya existe una reserva para esa fecha y hora.')
+        return
+      }
+
+      // Limpiamos posibles errores anteriores.
+      setFormError('')
+
+      // Guardamos los datos validados.
+      onSave({
+        client: cleanClient,
+        service: cleanService,
+        date,
+        time,
+        status,
+      })
+    }
 
   return (
     <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
@@ -56,6 +119,14 @@ function BookingForm({
 
       {/* Formulario */}
       <form onSubmit={handleSubmit} className="space-y-5">
+        {formError && (
+          <div
+            role="alert"
+            className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700"
+          >
+            {formError}
+          </div>
+        )}
 
         {/* Cliente */}
         <div>
@@ -111,6 +182,7 @@ function BookingForm({
             <input
               id="date"
               type="date"
+              min={getTodayDate()}
               value={date}
               onChange={(event) => setDate(event.target.value)}
               required
