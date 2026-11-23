@@ -9,6 +9,7 @@ import { initialBookings } from '../data/bookings'
 import {
   getStoredBookings,
   saveBookings,
+  linkBookingsToClients,
 } from '../services/bookingStorage'
 
 import BookingForm from '../components/bookings/BookingForm'
@@ -16,6 +17,12 @@ import BookingForm from '../components/bookings/BookingForm'
 import Toast from '../components/ui/Toast'
 
 import type { ToastType } from '../components/ui/Toast'
+
+// Importamos el tipo Client.
+import type { Client } from '../types/client'
+
+// Importamos las funciones para recuperar los clientes guardados.
+import { getStoredClients } from '../services/clientStorage'
 
 // Devuelve los estilos visuales según el estado.
 function getStatusStyles(status: BookingStatus) {
@@ -32,10 +39,24 @@ function getStatusStyles(status: BookingStatus) {
 }
 
 function Reservas() {
-  // Recuperamos las reservas guardadas.
-  // Si no existen, utilizamos los datos iniciales.
+  // Recuperamos primero los clientes registrados.
+  // Necesitamos tenerlos disponibles antes de cargar las reservas.
+  const [clients] = useState<Client[]>(() => {
+    return getStoredClients() ?? []
+  })
+
+  // Cargamos las reservas y las relacionamos con los clientes.
   const [bookings, setBookings] = useState<Booking[]>(() => {
-    return getStoredBookings() ?? initialBookings
+
+    // Recuperamos las reservas guardadas en localStorage.
+    const storedBookings = getStoredBookings()
+
+    // Si todavía no existen reservas guardadas, utilizamos los datos iniciales.
+    const bookingsToLoad = storedBookings ?? initialBookings
+
+    // Vinculamos las reservas con los clientes registrados.
+    // Si encontramos un único cliente con el mismo nombre, añadimos su clientId.
+    return linkBookingsToClients(bookingsToLoad, clients)
   })
 
   // Controla si mostramos el formulario.
@@ -238,8 +259,12 @@ function Reservas() {
         {isFormOpen && (
         <div className="mb-6">
           <BookingForm
+            // Reserva que estamos editando, si existe.
             initialBooking={editingBooking ?? undefined}
+            // Reservas existentes para controlar los conflictos horarios.
             existingBookings={bookings}
+            // Clientes registrados que podremos seleccionar.
+            existingClients={clients}
             onSave={
               editingBooking
                 ? handleUpdateBooking

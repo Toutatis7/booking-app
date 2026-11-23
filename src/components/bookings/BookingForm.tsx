@@ -4,12 +4,26 @@ import type { SyntheticEvent } from 'react'
 
 import type { Booking, BookingStatus } from '../../types/booking'
 
+// Importamos el tipo Client para trabajar con los clientes registrados.
+import type { Client } from '../../types/client'
+
+
 // Propiedades que recibirá nuestro formulario.
 type BookingFormProps = {
+  // Envía los datos de la reserva al componente padre.
   onSave: (booking: Omit<Booking, 'id'>) => void
+
+  // Permite cerrar el formulario sin guardar.
   onCancel: () => void
+
+  // Contiene la reserva que estamos editando, si existe.
   initialBooking?: Booking
+
+  // Reservas existentes para comprobar conflictos de horario.
   existingBookings: Booking[]
+
+  // Listado de clientes registrados en la aplicación.
+  existingClients: Client[]
 }
 
 function BookingForm({
@@ -17,6 +31,7 @@ function BookingForm({
     onCancel,
     initialBooking,
     existingBookings,
+    existingClients,
 }: BookingFormProps) {
 
     // Obtenemos la fecha actual en formato YYYY-MM-DD.
@@ -32,7 +47,25 @@ function BookingForm({
     // Estados de los campos del formulario.
     // Inicializamos los campos con los datos de la reserva,
     // si estamos editando. Si es nueva, empezarán vacíos.
-    const [client, setClient] = useState(initialBooking?.client ?? '')
+    // Buscamos el cliente asociado a la reserva que estamos editando.
+    // Primero intentamos localizarlo mediante clientId.
+    // Si es una reserva antigua, intentamos encontrarlo por su nombre.
+    const initialClient = initialBooking
+      ? existingClients.find(
+          (client) => client.id === initialBooking.clientId
+        ) ??
+        existingClients.find(
+          (client) =>
+            client.name.trim().toLowerCase() ===
+            initialBooking.client.trim().toLowerCase()
+        )
+      : undefined
+
+    // Guardamos el identificador del cliente seleccionado.
+    // Los elementos select trabajan con valores de tipo string.
+    const [clientId, setClientId] = useState(
+      initialClient ? String(initialClient.id) : ''
+    )
     const [service, setService] = useState(initialBooking?.service ?? '')
     const [date, setDate] = useState(initialBooking?.date ?? '')
     const [time, setTime] = useState(initialBooking?.time ?? '')
@@ -47,13 +80,23 @@ function BookingForm({
     function handleSubmit(event: SyntheticEvent<HTMLFormElement>) {
       event.preventDefault()
 
-      // Eliminamos los espacios innecesarios.
-      const cleanClient = client.trim()
+      // Limpiamos los espacios innecesarios del servicio.
       const cleanService = service.trim()
 
-      // Comprobamos que los campos de texto no estén vacíos.
-      if (!cleanClient || !cleanService) {
-        setFormError('El nombre del cliente y el servicio son obligatorios.')
+      // Buscamos el cliente seleccionado utilizando su identificador.
+      const selectedClient = existingClients.find(
+        (client) => client.id === Number(clientId)
+      )
+
+      // Comprobamos que se haya seleccionado un cliente registrado.
+      if (!selectedClient) {
+        setFormError('Debes seleccionar un cliente registrado.')
+        return
+      }
+
+      // Comprobamos que el servicio no esté vacío.
+      if (!cleanService) {
+        setFormError('El servicio es obligatorio.')
         return
       }
 
@@ -93,9 +136,14 @@ function BookingForm({
       // Limpiamos posibles errores anteriores.
       setFormError('')
 
-      // Guardamos los datos validados.
+      // Enviamos los datos de la reserva al componente padre.
       onSave({
-        client: cleanClient,
+        // Guardamos el identificador único del cliente.
+        clientId: selectedClient.id,
+
+        // También guardamos su nombre para mostrarlo en los listados.
+        client: selectedClient.name,
+
         service: cleanService,
         date,
         time,
@@ -134,18 +182,38 @@ function BookingForm({
             htmlFor="client"
             className="mb-2 block text-sm font-medium text-slate-700"
           >
-            Nombre del cliente
+            Seleccionar cliente
           </label>
 
-          <input
+          <select
             id="client"
-            type="text"
-            value={client}
-            onChange={(event) => setClient(event.target.value)}
-            placeholder="Ej. Laura Martínez"
+            value={clientId}
+            onChange={(event) => setClientId(event.target.value)}
             required
-            className="w-full rounded-xl border border-slate-200 px-4 py-3 text-sm outline-none focus:border-blue-500"
-          />
+            disabled={existingClients.length === 0}
+            className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none focus:border-blue-500 disabled:cursor-not-allowed disabled:bg-slate-100"
+          >
+            {/* Opción inicial que obliga a seleccionar un cliente. */}
+            <option value="">
+              {existingClients.length === 0
+                ? 'No hay clientes registrados'
+                : 'Selecciona un cliente'}
+            </option>
+
+            {/* Generamos una opción por cada cliente registrado. */}
+            {existingClients.map((client) => (
+              <option key={client.id} value={client.id}>
+                {client.name} — {client.email}
+              </option>
+            ))}
+          </select>
+
+          {/* Explicamos qué hacer si todavía no hay clientes. */}
+          {existingClients.length === 0 && (
+            <p className="mt-2 text-sm text-orange-600">
+              Primero debes registrar un cliente en el apartado Clientes.
+            </p>
+          )}
         </div>
 
         {/* Servicio */}

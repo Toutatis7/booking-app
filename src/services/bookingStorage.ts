@@ -1,6 +1,44 @@
 
 import type { Booking } from '../types/booking'
 
+// Importamos el tipo Client para poder relacionar reservas y clientes.
+import type { Client } from '../types/client'
+
+// Relaciona las reservas antiguas con los clientes registrados.
+export function linkBookingsToClients(
+  bookings: Booking[],
+  clients: Client[]
+): Booking[] {
+
+  // Recorremos todas las reservas para comprobar si tienen cliente asociado.
+  return bookings.map((booking) => {
+
+    // Si la reserva ya tiene clientId, no necesitamos modificarla.
+    if (booking.clientId !== undefined) {
+      return booking
+    }
+
+    // Normalizamos el nombre de la reserva para comparar correctamente.
+    const bookingClientName = booking.client.trim().toLowerCase()
+
+    // Buscamos todos los clientes cuyo nombre coincide.
+    const matchingClients = clients.filter((client) => {
+      return client.name.trim().toLowerCase() === bookingClientName
+    })
+
+    // Solo asociamos el cliente cuando existe una única coincidencia.
+    if (matchingClients.length === 1) {
+      return {
+        ...booking,
+        clientId: matchingClients[0].id,
+      }
+    }
+
+    // Si no hay coincidencias o hay varias, conservamos la reserva original.
+    return booking
+  })
+}
+
 // Clave con la que identificaremos nuestros datos.
 const STORAGE_KEY = 'booking-app-reservations'
 

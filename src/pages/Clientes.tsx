@@ -5,6 +5,13 @@ import { useEffect, useState } from 'react'
 import { Search, Plus, Users, Pencil, Trash2 } from 'lucide-react'
 
 import type { Client } from '../types/client'
+
+// Importamos el tipo Booking para trabajar con las reservas.
+import type { Booking } from '../types/booking'
+
+// Recuperamos las reservas almacenadas en el navegador.
+import { getStoredBookings } from '../services/bookingStorage'
+
 import ClientForm from '../components/clients/ClientForm'
 
 import {
@@ -52,6 +59,13 @@ function Clientes() {
   // Guardamos el cliente que estamos editando.
   // null significa que no hay ningun cliente seleccionado.
   const [editingClient, setEditingClient] = useState<Client | null>(null)
+
+  // Cliente cuyo historial de reservas estamos consultando.
+  // null significa que no hay ningún historial abierto.
+  const [historyClient, setHistoryClient] = useState<Client | null>(null)
+
+  // Reservas pertenecientes al cliente seleccionado.
+  const [historyBookings, setHistoryBookings] = useState<Booking[]>([])
 
   // Estado del buscador.
   const [searchTerm, setSearchTerm] = useState('')
@@ -120,36 +134,94 @@ function Clientes() {
     setIsFormOpen(true)
   }
 
-  // Elimina un cliente utilizando su identificador.
-  function handleDeleteClient(id: number) {
+  // Recupera el historial de reservas de un cliente.
+  function handleViewHistory(client: Client) {
 
-    // Buscamos el cliente que coincide con el identificador recibido.
-    const clientToDelete = clients.find((client) => client.id === id)
+    // Recuperamos las reservas almacenadas en el navegador.
+    const storedBookings = getStoredBookings()
 
-    // Si no encontramos el cliente, no continuamos.
-    if (!clientToDelete) {
-      return
-    }
+    // Si todavía no existen reservas, utilizamos un array vacío.
+    const bookings: Booking[] = storedBookings ?? []
 
-    // Solicitamos confirmación antes de eliminar el registro.
-    const confirmed = window.confirm(
-      `¿Estás seguro de que quieres eliminar a ${clientToDelete.name}?`
-    )
-
-    // Si el usuario cancela, detenemos la operación.
-    if (!confirmed) {
-      return
-    }
-
-    // Creamos un nuevo array excluyendo al cliente seleccionado.
-    const updatedClients = clients.filter((client) => {
-      return client.id !== id
+    // Filtramos las reservas utilizando el identificador del cliente.
+    const clientHistory = bookings.filter((booking) => {
+      return booking.clientId === client.id
     })
 
-    // Actualizamos el estado de React.
-    // El useEffect que ya tenemos guardará los cambios en localStorage.
-    setClients(updatedClients)
+    // Guardamos el cliente cuyo historial queremos consultar.
+    setHistoryClient(client)
+
+    // Guardamos las reservas encontradas.
+    setHistoryBookings(clientHistory)
   }
+
+  // Cierra el historial y limpia los datos temporales.
+  function handleCloseHistory() {
+
+    // Indicamos que ya no hay ningún cliente seleccionado.
+    setHistoryClient(null)
+
+    // Vaciamos el listado de reservas mostrado.
+    setHistoryBookings([])
+  }
+  // Elimina un cliente utilizando su identificador.
+function handleDeleteClient(id: number) {
+
+  // Buscamos el cliente que coincide con el identificador recibido.
+  const clientToDelete = clients.find((client) => client.id === id)
+
+  // Si no encontramos el cliente, no continuamos.
+  if (!clientToDelete) {
+    return
+  }
+
+  // Recuperamos las reservas almacenadas en localStorage.
+  const storedBookings = getStoredBookings()
+
+  // Si no hay reservas guardadas, utilizamos un array vacío.
+  const bookings: Booking[] = storedBookings ?? []
+
+  // Buscamos las reservas que pertenecen al cliente seleccionado.
+  const clientBookings = bookings.filter((booking) => {
+    return booking.clientId === id
+  })
+
+  // Comprobamos si tiene alguna reserva pendiente o confirmada.
+  const hasActiveBookings = clientBookings.some((booking) => {
+    return (
+      booking.status === 'Confirmada' ||
+      booking.status === 'Pendiente'
+    )
+  })
+
+  // Si tiene reservas activas, impedimos eliminar al cliente.
+  if (hasActiveBookings) {
+    window.alert(
+      `No se puede eliminar a ${clientToDelete.name} porque tiene reservas pendientes o confirmadas. Cancela esas reservas antes de eliminar al cliente.`
+    )
+
+    return
+  }
+
+  // Solicitamos confirmación antes de eliminar el registro.
+  const confirmed = window.confirm(
+    `¿Estás seguro de que quieres eliminar a ${clientToDelete.name}?`
+  )
+
+  // Si el usuario cancela, detenemos la operación.
+  if (!confirmed) {
+    return
+  }
+
+  // Creamos un nuevo array excluyendo al cliente seleccionado.
+  const updatedClients = clients.filter((client) => {
+    return client.id !== id
+  })
+
+  // Actualizamos el estado de React.
+  // El useEffect que ya tenemos guardará los cambios en localStorage.
+  setClients(updatedClients)
+}
 
   // Filtramos los clientes según la búsqueda.
   const filteredClients = clients.filter((client) => {
@@ -305,6 +377,16 @@ function Clientes() {
 
                     {/* Agrupamos los botones para mantenerlos alineados. */}
                     <div className="flex items-center gap-2">
+                      {/* Boton para consultar el historial de reservas del cliente. */}
+                      <button
+                        type="button"
+                        onClick={() => handleViewHistory(client)}
+                        className="inline-flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium text-emerald-600 transition hover:bg-emerald-50"
+                        aria-label={`Ver historial de ${client.name}`}
+                      >
+                        <Users size={16} />
+                        Historial
+                      </button>
 
                       {/* Botón para abrir el formulario de edición. */}
                       <button
@@ -348,6 +430,103 @@ function Clientes() {
           </table>
         </div>
       </div>
+            {/* Panel que muestra el historial del cliente seleccionado. */}
+      {historyClient && (
+        <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+
+          {/* Encabezado del historial. */}
+          <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+
+            <div>
+              <h2 className="text-xl font-bold text-slate-800">
+                Historial de reservas
+              </h2>
+
+              <p className="mt-1 text-sm text-slate-500">
+                Reservas de {historyClient.name}
+              </p>
+            </div>
+
+            {/* Botón para cerrar el historial. */}
+            <button
+              type="button"
+              onClick={handleCloseHistory}
+              className="rounded-xl border border-slate-200 px-4 py-2 text-sm font-medium text-slate-600 transition hover:bg-slate-50"
+            >
+              Cerrar historial
+            </button>
+
+          </div>
+
+          {/* Comprobamos si el cliente tiene reservas. */}
+          {historyBookings.length === 0 ? (
+
+            // Mensaje cuando no existen reservas asociadas.
+            <p className="rounded-xl bg-slate-50 p-6 text-center text-sm text-slate-500">
+              Este cliente todavía no tiene reservas registradas.
+            </p>
+
+          ) : (
+
+            // Mostramos todas las reservas encontradas.
+            <div className="overflow-x-auto">
+              <table className="w-full min-w-[600px] text-left">
+
+                <thead className="border-b border-slate-200 bg-slate-50">
+                  <tr>
+                    <th className="px-4 py-3 text-xs font-semibold uppercase text-slate-500">
+                      Servicio
+                    </th>
+
+                    <th className="px-4 py-3 text-xs font-semibold uppercase text-slate-500">
+                      Fecha
+                    </th>
+
+                    <th className="px-4 py-3 text-xs font-semibold uppercase text-slate-500">
+                      Hora
+                    </th>
+
+                    <th className="px-4 py-3 text-xs font-semibold uppercase text-slate-500">
+                      Estado
+                    </th>
+                  </tr>
+                </thead>
+
+                <tbody className="divide-y divide-slate-100">
+
+                  {historyBookings.map((booking) => (
+                    <tr key={booking.id}>
+
+                      <td className="px-4 py-4 text-sm font-medium text-slate-800">
+                        {booking.service}
+                      </td>
+
+                      <td className="px-4 py-4 text-sm text-slate-600">
+                        {new Date(
+                          `${booking.date}T00:00:00`
+                        ).toLocaleDateString('es-ES')}
+                      </td>
+
+                      <td className="px-4 py-4 text-sm text-slate-600">
+                        {booking.time}
+                      </td>
+
+                      <td className="px-4 py-4">
+                        <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-medium text-slate-700">
+                          {booking.status}
+                        </span>
+                      </td>
+
+                    </tr>
+                  ))}
+
+                </tbody>
+              </table>
+            </div>
+          )}
+
+        </div>
+      )}
     </section>
   )
 }
