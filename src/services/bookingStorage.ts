@@ -4,6 +4,9 @@ import type { Booking } from '../types/booking'
 // Importamos el tipo Client para poder relacionar reservas y clientes.
 import type { Client } from '../types/client'
 
+// Importamos el tipo Service para relacionar reservas y servicios.
+import type { Service } from '../types/service'
+
 // Relaciona las reservas antiguas con los clientes registrados.
 export function linkBookingsToClients(
   bookings: Booking[],
@@ -37,6 +40,66 @@ export function linkBookingsToClients(
     // Si no hay coincidencias o hay varias, conservamos la reserva original.
     return booking
   })
+}
+
+// Relaciona las reservas antiguas con los servicios registrados.
+export function linkBookingsToServices(
+  bookings: Booking[],
+  services: Service[]
+): Booking[] {
+
+  // Recorremos todas las reservas.
+  return bookings.map((booking) => {
+
+    // Si ya tiene serviceId, conservamos la reserva.
+    if (booking.serviceId !== undefined) {
+      return booking
+    }
+
+    // Normalizamos el nombre del servicio de la reserva.
+    const bookingServiceName = booking.service.trim().toLowerCase()
+
+    // Buscamos servicios cuyo nombre coincida.
+    const matchingServices = services.filter((service) => {
+      return service.name.trim().toLowerCase() === bookingServiceName
+    })
+
+    // Solo asociamos el servicio si existe una coincidencia única.
+    if (matchingServices.length === 1) {
+      return {
+        ...booking,
+        serviceId: matchingServices[0].id,
+      }
+    }
+
+    // Si no hay coincidencias o existen varias, conservamos la reserva.
+    return booking
+  })
+}
+
+// Carga las reservas y relaciona cada una con sus clientes y servicios.
+export function getBookingsWithRelations(
+  clients: Client[],
+  services: Service[],
+  initialBookings: Booking[]
+): Booking[] {
+  // Recuperamos las reservas guardadas o utilizamos las iniciales.
+  const storedBookings = getStoredBookings()
+  const bookingsToLoad = storedBookings ?? initialBookings
+
+  // Relacionamos las reservas antiguas con los clientes registrados.
+  const bookingsWithClients = linkBookingsToClients(
+    bookingsToLoad,
+    clients
+  )
+
+  // Relacionamos las reservas antiguas con los servicios registrados.
+  const bookingsWithServices = linkBookingsToServices(
+    bookingsWithClients,
+    services
+  )
+
+  return bookingsWithServices
 }
 
 // Clave con la que identificaremos nuestros datos.

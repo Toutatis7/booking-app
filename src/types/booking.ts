@@ -23,6 +23,10 @@ export type Booking = {
   // Servicio contratado o solicitado.
   service: string
 
+// Identificador del servicio asociado a la reserva.
+// Es opcional para mantener la compatibilidad con reservas antiguas.
+serviceId?: number
+
   // Fecha de la reserva en formato YYYY-MM-DD.
   date: string
 

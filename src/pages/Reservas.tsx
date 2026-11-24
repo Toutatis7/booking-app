@@ -7,9 +7,9 @@ import type { Booking, BookingStatus } from '../types/booking'
 import { initialBookings } from '../data/bookings'
 
 import {
-  getStoredBookings,
+  getBookingsWithRelations,
   saveBookings,
-  linkBookingsToClients,
+
 } from '../services/bookingStorage'
 
 import BookingForm from '../components/bookings/BookingForm'
@@ -20,6 +20,15 @@ import type { ToastType } from '../components/ui/Toast'
 
 // Importamos el tipo Client.
 import type { Client } from '../types/client'
+
+// Importamos el tipo Service.
+import type { Service } from '../types/service'
+
+// Importamos los servicios iniciales.
+import { initialServices } from '../data/services'
+
+// Importamos la función para recuperar los servicios guardados.
+import { getStoredServices } from '../services/serviceStorage'
 
 // Importamos las funciones para recuperar los clientes guardados.
 import { getStoredClients } from '../services/clientStorage'
@@ -45,19 +54,26 @@ function Reservas() {
     return getStoredClients() ?? []
   })
 
-  // Cargamos las reservas y las relacionamos con los clientes.
-  const [bookings, setBookings] = useState<Booking[]>(() => {
-
-    // Recuperamos las reservas guardadas en localStorage.
-    const storedBookings = getStoredBookings()
-
-    // Si todavía no existen reservas guardadas, utilizamos los datos iniciales.
-    const bookingsToLoad = storedBookings ?? initialBookings
-
-    // Vinculamos las reservas con los clientes registrados.
-    // Si encontramos un único cliente con el mismo nombre, añadimos su clientId.
-    return linkBookingsToClients(bookingsToLoad, clients)
+  // Recuperamos los servicios registrados en la aplicación.
+  const [services] = useState<Service[]>(() => {
+    // Si existen servicios guardados, los recuperamos.
+    // Si todavía no hay datos guardados, utilizamos los iniciales.
+    return getStoredServices() ?? initialServices
   })
+
+  // Cargamos las reservas y relacionamos sus clientes y servicios.
+  const [bookings, setBookings] = useState<Booking[]>(() =>
+    getBookingsWithRelations(clients, services, initialBookings)
+  )
+
+  // Guardamos las reservas cuando cambian sus datos.
+  useEffect(() => {
+
+    // Persistimos las reservas en localStorage.
+    saveBookings(bookings)
+
+  }, [bookings])
+
 
   // Controla si mostramos el formulario.
   const [isFormOpen, setIsFormOpen] = useState(false)
@@ -90,14 +106,7 @@ function Reservas() {
 
     return matchesSearch && matchesStatus
   })
-
-  // Guardamos las reservas cada vez que cambia la lista.
-  useEffect(() => {
-    saveBookings(bookings)
-  }, [bookings])
-
-
-
+  
   // Añade una nueva reserva a la lista.
   function handleSaveBooking(newBooking: Omit<Booking, 'id'>) {
 
@@ -265,6 +274,7 @@ function Reservas() {
             existingBookings={bookings}
             // Clientes registrados que podremos seleccionar.
             existingClients={clients}
+            existingServices={services}
             onSave={
               editingBooking
                 ? handleUpdateBooking
@@ -432,7 +442,7 @@ function Reservas() {
 
                 <tr>
                   <td
-                    colSpan={5}
+                    colSpan={6}
                     className="px-6 py-10 text-center text-sm text-slate-500"
                   >
                     No se encontraron reservas.

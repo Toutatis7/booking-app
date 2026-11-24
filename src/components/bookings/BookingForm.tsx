@@ -1,12 +1,23 @@
 
 import { useState } from 'react'
+
+
 import type { SyntheticEvent } from 'react'
 
+// Importamos los tipos necesarios para las reservas.
 import type { Booking, BookingStatus } from '../../types/booking'
 
-// Importamos el tipo Client para trabajar con los clientes registrados.
+// Importamos el tipo Client.
 import type { Client } from '../../types/client'
 
+// Importamos el tipo Service.
+import type { Service } from '../../types/service'
+
+// Importamos los servicios iniciales.
+import { initialServices } from '../../data/services'
+
+// Importamos la función que recupera los servicios guardados.
+import { getStoredServices } from '../../services/serviceStorage'
 
 // Propiedades que recibirá nuestro formulario.
 type BookingFormProps = {
@@ -22,134 +33,245 @@ type BookingFormProps = {
   // Reservas existentes para comprobar conflictos de horario.
   existingBookings: Booking[]
 
-  // Listado de clientes registrados en la aplicación.
+  // Listado de clientes registrados.
   existingClients: Client[]
+
+  // Listado de servicios registrados.
+  existingServices: Service[]
+}
+
+// Convierte una hora HH:MM en minutos desde medianoche.
+function timeToMinutes(time: string): number {
+  const [hours, minutes] = time.split(':').map(Number)
+
+  return hours * 60 + minutes
 }
 
 function BookingForm({
-    onSave,
-    onCancel,
-    initialBooking,
-    existingBookings,
-    existingClients,
+  onSave,
+  onCancel,
+  initialBooking,
+  existingBookings,
+  existingClients,
+  existingServices,
 }: BookingFormProps) {
 
-    // Obtenemos la fecha actual en formato YYYY-MM-DD.
-    function getTodayDate(): string {
-      const today = new Date()
+  // Obtenemos la fecha actual en formato YYYY-MM-DD.
+  function getTodayDate(): string {
+    const today = new Date()
 
-      const year = today.getFullYear()
-      const month = String(today.getMonth() + 1).padStart(2, '0')
-      const day = String(today.getDate()).padStart(2, '0')
+    const year = today.getFullYear()
+    const month = String(today.getMonth() + 1).padStart(2, '0')
+    const day = String(today.getDate()).padStart(2, '0')
 
-      return `${year}-${month}-${day}`
-    }
-    // Estados de los campos del formulario.
-    // Inicializamos los campos con los datos de la reserva,
-    // si estamos editando. Si es nueva, empezarán vacíos.
-    // Buscamos el cliente asociado a la reserva que estamos editando.
-    // Primero intentamos localizarlo mediante clientId.
-    // Si es una reserva antigua, intentamos encontrarlo por su nombre.
-    const initialClient = initialBooking
-      ? existingClients.find(
-          (client) => client.id === initialBooking.clientId
-        ) ??
-        existingClients.find(
-          (client) =>
-            client.name.trim().toLowerCase() ===
-            initialBooking.client.trim().toLowerCase()
-        )
-      : undefined
+    return `${year}-${month}-${day}`
+  }
 
-    // Guardamos el identificador del cliente seleccionado.
-    // Los elementos select trabajan con valores de tipo string.
-    const [clientId, setClientId] = useState(
-      initialClient ? String(initialClient.id) : ''
-    )
-    const [service, setService] = useState(initialBooking?.service ?? '')
-    const [date, setDate] = useState(initialBooking?.date ?? '')
-    const [time, setTime] = useState(initialBooking?.time ?? '')
-    const [status, setStatus] = useState<BookingStatus>(
+  // Buscamos el cliente asociado a la reserva que estamos editando.
+  // Primero intentamos localizarlo mediante clientId.
+  // Si es una reserva antigua, buscamos por su nombre.
+  const initialClient = initialBooking
+    ? existingClients.find(
+        (client) => client.id === initialBooking.clientId
+      ) ??
+      existingClients.find(
+        (client) =>
+          client.name.trim().toLowerCase() ===
+          initialBooking.client.trim().toLowerCase()
+      )
+    : undefined
+
+  // Recuperamos los servicios guardados en localStorage.
+  const storedServices = getStoredServices()
+
+  // Utilizamos los servicios recibidos desde el componente padre.
+  // Si no hay ninguno, recurrimos a localStorage o a los iniciales.
+  const servicesToUse = existingServices.length > 0
+    ? existingServices
+    : storedServices ?? initialServices
+
+  // Buscamos el servicio de la reserva que estamos editando.
+  // Primero utilizamos serviceId y, si es una reserva antigua,
+  // intentamos localizarlo mediante su nombre.
+  const initialService = initialBooking
+    ? servicesToUse.find(
+        (item) => item.id === initialBooking.serviceId
+      ) ??
+      servicesToUse.find(
+        (item) => item.name === initialBooking.service
+      )
+    : undefined
+
+  // Mostramos los servicios activos.
+  // Si editamos una reserva antigua con un servicio inactivo,
+  // también lo mantenemos disponible para no perder su selección.
+  const availableServices = servicesToUse.filter(
+    (item) =>
+      item.status === 'Activo' ||
+      item.id === initialService?.id
+  )
+
+  // Guardamos el identificador del cliente seleccionado.
+  // Los elementos select trabajan con valores de tipo string.
+  const [clientId, setClientId] = useState(
+    initialClient ? String(initialClient.id) : ''
+  )
+
+  // Guardamos el identificador del servicio seleccionado.
+  const [serviceId, setServiceId] = useState(
+    initialService ? String(initialService.id) : ''
+  )
+
+  // Estados de fecha, hora y estado de la reserva.
+  const [date, setDate] = useState(initialBooking?.date ?? '')
+  const [time, setTime] = useState(initialBooking?.time ?? '')
+
+  const [status, setStatus] = useState<BookingStatus>(
     initialBooking?.status ?? 'Pendiente'
+  )
+
+  // Almacenamos los posibles errores de validación.
+  const [formError, setFormError] = useState('')
+
+  // Procesamos el envío del formulario.
+  function handleSubmit(event: SyntheticEvent<HTMLFormElement>) {
+    event.preventDefault()
+
+    // Buscamos el cliente seleccionado mediante su identificador.
+    const selectedClient = existingClients.find(
+      (client) => client.id === Number(clientId)
     )
 
-    // Almacena los posibles errores de validacion.
-    const [formError, setFormError ] = useState('')
+    // Comprobamos que se haya seleccionado un cliente registrado.
+    if (!selectedClient) {
+      setFormError('Debes seleccionar un cliente registrado.')
+      return
+    }
 
-    // Procesamos el envío del formulario.
-    function handleSubmit(event: SyntheticEvent<HTMLFormElement>) {
-      event.preventDefault()
+    // Buscamos el servicio seleccionado mediante su identificador.
+    const selectedService = servicesToUse.find(
+      (item) => item.id === Number(serviceId)
+    )
 
-      // Limpiamos los espacios innecesarios del servicio.
-      const cleanService = service.trim()
+    // Comprobamos que se haya seleccionado un servicio válido.
+    if (!selectedService) {
+      setFormError('Debes seleccionar un servicio.')
+      return
+    }
 
-      // Buscamos el cliente seleccionado utilizando su identificador.
-      const selectedClient = existingClients.find(
-        (client) => client.id === Number(clientId)
+    // Comprobamos que el servicio esté activo.
+    // Permitimos conservar el servicio inactivo de una reserva
+    // que ya existía antes de editarla.
+    if (
+      selectedService.status !== 'Activo' &&
+      selectedService.id !== initialService?.id
+    ) {
+      setFormError('El servicio seleccionado no está activo.')
+      return
+    }
+
+    // Comprobamos que se haya seleccionado una fecha.
+    if (!date) {
+      setFormError('Debes seleccionar una fecha.')
+      return
+    }
+
+    // Comprobamos que la fecha no sea anterior a hoy.
+    if (date < getTodayDate()) {
+      setFormError('No puedes crear una reserva en una fecha pasada.')
+      return
+    }
+
+    // Comprobamos que se haya seleccionado una hora.
+    if (!time) {
+      setFormError('Debes seleccionar una hora.')
+      return
+    }
+
+    // Comprobamos si ya existe otra reserva en esa fecha y hora.
+    // Comprobamos si la nueva reserva se solapa con otra existente.
+    const newBookingStart = timeToMinutes(time)
+
+    // Calculamos cuándo termina la nueva reserva.
+    const newBookingEnd = newBookingStart + selectedService.duration
+
+    // Comprobamos que la reserva no termine despues de medianoche.
+    if (newBookingEnd > 24 * 60) {
+      setFormError(
+        'La reserva no puede terminar después de medianoche.'
+      )
+      return
+    }
+
+    const hasConflict = existingBookings.some((booking) => {
+
+      // Ignoramos las reservas de otras fechas.
+      if (booking.date !== date) {
+        return false
+      }
+
+      // Ignoramos la propia reserva cuando estamos editándola.
+      if (booking.id === initialBooking?.id) {
+        return false
+      }
+
+      // Las reservas canceladas no bloquean horarios.
+      if (booking.status === 'Cancelada') {
+        return false
+      }
+
+      // Buscamos el servicio asociado a la reserva existente.
+      const existingService = servicesToUse.find(
+        (item) => item.id === booking.serviceId
+      ) ?? servicesToUse.find(
+        (item) => item.name === booking.service
       )
 
-      // Comprobamos que se haya seleccionado un cliente registrado.
-      if (!selectedClient) {
-        setFormError('Debes seleccionar un cliente registrado.')
-        return
+      // Si no conocemos la duración, no podemos calcular el solapamiento.
+      if (!existingService) {
+        return false
       }
 
-      // Comprobamos que el servicio no esté vacío.
-      if (!cleanService) {
-        setFormError('El servicio es obligatorio.')
-        return
-      }
+      // Calculamos el intervalo horario de la reserva existente.
+      const existingBookingStart = timeToMinutes(booking.time)
+      const existingBookingEnd =
+        existingBookingStart + existingService.duration
 
-      // Comprobamos que la fecha no esté vacía.
-      if (!date) {
-        setFormError('Debes seleccionar una fecha.')
-        return
-      }
+      // Comprobamos si ambos intervalos horarios se solapan.
+      return (
+        newBookingStart < existingBookingEnd &&
+        newBookingEnd > existingBookingStart
+      )
+    })
 
-      // Comprobamos que la fecha no sea anterior a hoy.
-      if (date < getTodayDate()) {
-        setFormError('No puedes crear una reserva en una fecha pasada.')
-        return
-      }
-
-      // Comprobamos que se haya seleccionado una hora.
-      if (!time) {
-        setFormError('Debes seleccionar una hora.')
-        return
-      }
-
-      // Comprobamos si ya existe otra reserva en esa fecha y hora.
-      const hasConflict = existingBookings.some((booking) => {
-        return (
-          booking.date === date &&
-          booking.time === time &&
-          booking.id !== initialBooking?.id
-        )
-      })
-
-      // Si existe otra reserva, detenemos el envío.
-      if (hasConflict) {
-        setFormError('Ya existe una reserva para esa fecha y hora.')
-        return
-      }
-
-      // Limpiamos posibles errores anteriores.
-      setFormError('')
-
-      // Enviamos los datos de la reserva al componente padre.
-      onSave({
-        // Guardamos el identificador único del cliente.
-        clientId: selectedClient.id,
-
-        // También guardamos su nombre para mostrarlo en los listados.
-        client: selectedClient.name,
-
-        service: cleanService,
-        date,
-        time,
-        status,
-      })
+    // Si existe otra reserva, detenemos el envío.
+    if (hasConflict) {
+      setFormError('Ya existe una reserva para esa fecha y hora.')
+      return
     }
+
+    // Limpiamos posibles errores anteriores.
+    setFormError('')
+
+    // Enviamos los datos de la reserva al componente padre.
+    onSave({
+      // Guardamos el identificador único del cliente.
+      clientId: selectedClient.id,
+
+      // Guardamos también su nombre para mostrarlo en los listados.
+      client: selectedClient.name,
+
+      // Guardamos el identificador único del servicio.
+      serviceId: selectedService.id,
+
+      // Guardamos su nombre para mostrarlo en los listados.
+      service: selectedService.name,
+
+      date,
+      time,
+      status,
+    })
+  }
 
   return (
     <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
@@ -217,6 +339,7 @@ function BookingForm({
         </div>
 
         {/* Servicio */}
+        {/** Servicio **/}
         <div>
           <label
             htmlFor="service"
@@ -225,15 +348,35 @@ function BookingForm({
             Servicio
           </label>
 
-          <input
+          <select
             id="service"
-            type="text"
-            value={service}
-            onChange={(event) => setService(event.target.value)}
-            placeholder="Ej. Consulta general"
+            value={serviceId}
+            onChange={(event) => setServiceId(event.target.value)}
             required
-            className="w-full rounded-xl border border-slate-200 px-4 py-3 text-sm outline-none focus:border-blue-500"
-          />
+            disabled={availableServices.length === 0}
+            className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none focus:border-blue-500 disabled:cursor-not-allowed disabled:bg-slate-100"
+          >
+            {/** Opción inicial del selector. **/}
+            <option value="">
+              {availableServices.length === 0
+                ? 'No hay servicios disponibles'
+                : 'Selecciona un servicio'}
+            </option>
+
+            {/** Generamos una opción por cada servicio disponible. **/}
+            {availableServices.map((item) => (
+              <option key={item.id} value={item.id}>
+                {item.name} — {item.duration} min — {item.price} €
+              </option>
+            ))}
+          </select>
+
+          {/** Avisamos si no existen servicios activos. **/}
+          {availableServices.length === 0 && (
+            <p className="mt-2 text-sm text-orange-600">
+              Primero debes registrar un servicio activo en el apartado Servicios.
+            </p>
+          )}
         </div>
 
         {/* Fecha y hora */}
