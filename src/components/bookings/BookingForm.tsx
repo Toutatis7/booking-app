@@ -47,6 +47,19 @@ function timeToMinutes(time: string): number {
   return hours * 60 + minutes
 }
 
+// Convierte los minutos desde medianoche en formato HH:MM.
+function minutesToTime(totalMinutes: number): string {
+  // Calculamos las horas y los minutos.
+  const hours = Math.floor(totalMinutes / 60) % 24
+  const minutes = totalMinutes % 60
+
+  // Añadimos un cero delante cuando sea necesario.
+  const formattedHours = String(hours).padStart(2, '0')
+  const formattedMinutes = String(minutes).padStart(2, '0')
+
+  return `${formattedHours}:${formattedMinutes}`
+}
+
 function BookingForm({
   onSave,
   onCancel,
@@ -122,6 +135,12 @@ function BookingForm({
     initialService ? String(initialService.id) : ''
   )
 
+  // Obtenemos el servicio seleccionado actualmente.
+  const selectedService = servicesToUse.find(
+    (item) => item.id === Number(serviceId)
+  )
+
+
   // Estados de fecha, hora y estado de la reserva.
   const [date, setDate] = useState(initialBooking?.date ?? '')
   const [time, setTime] = useState(initialBooking?.time ?? '')
@@ -129,6 +148,22 @@ function BookingForm({
   const [status, setStatus] = useState<BookingStatus>(
     initialBooking?.status ?? 'Pendiente'
   )
+
+  // Calculamos los minutos totales de finalizacion.
+  const estimatedEndMinutes =
+    selectedService && time
+      ? timeToMinutes(time) + selectedService.duration
+      : null
+
+  // Calculamos la hora estimada de finalizacion.
+  const estimatedEndTime =
+    estimatedEndMinutes !== null
+      ? minutesToTime(estimatedEndMinutes)
+        : ''
+
+  // Comprobamos si la reserva termina al dia siguiente.
+  const endsNextDay =
+    estimatedEndMinutes !== null && estimatedEndMinutes >= 1440
 
   // Almacenamos los posibles errores de validación.
   const [formError, setFormError] = useState('')
@@ -148,10 +183,6 @@ function BookingForm({
       return
     }
 
-    // Buscamos el servicio seleccionado mediante su identificador.
-    const selectedService = servicesToUse.find(
-      (item) => item.id === Number(serviceId)
-    )
 
     // Comprobamos que se haya seleccionado un servicio válido.
     if (!selectedService) {
@@ -420,6 +451,69 @@ function BookingForm({
           </div>
 
         </div>
+
+        {/* Resumen del horario seleccionado */}
+        {selectedService && time && (
+          <div className="rounded-xl border border-blue-200 bg-blue-50 p-4">
+
+            <h3 className="mb-3 text-sm font-semibold text-blue-900">
+              Resumen de la reserva
+            </h3>
+
+            <div className="grid grid-cols-3 gap-3">
+
+              {/* Duración del servicio */}
+              <div>
+                <p className="text-xs text-blue-700">
+                  Duración
+                </p>
+
+                <p className="mt-1 text-sm font-semibold text-blue-900">
+                  {selectedService.duration} min
+                </p>
+              </div>
+
+              {/* Hora de inicio */}
+              <div>
+                <p className="text-xs text-blue-700">
+                  Hora de inicio
+                </p>
+
+                <p className="mt-1 text-sm font-semibold text-blue-900">
+                  {time}
+                </p>
+              </div>
+
+              {/* Hora de finalización */}
+              <div>
+                <p className="text-xs text-blue-700">
+                  Hora de finalización
+                </p>
+
+                <p className="mt-1 text-sm font-semibold text-blue-900">
+                  {estimatedEndTime}
+
+                  {/* Indicamos si termina al dia siguiente. */}
+                  {endsNextDay && (
+                    <span className="ml-1 text-xs text-amber-700">
+                      (+1 dia)
+                    </span>
+                  )}
+                </p>
+              </div>
+
+            </div>
+
+            {/* Aviso si la reserva termina después de medianoche */}
+            {timeToMinutes(time) + selectedService.duration > 1440 && (
+              <p className="mt-3 rounded-lg bg-red-100 p-3 text-sm text-red-700">
+                Esta reserva terminaría después de medianoche.
+                Selecciona otra hora.
+              </p>
+            )}
+
+          </div>
+        )}
 
         {/* Estado */}
         <div>
